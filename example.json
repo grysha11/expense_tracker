@@ -1,0 +1,9 @@
+{
+    "id": "123",
+    "user_id": "u123",
+    "category": "grocery",
+    "amount": "46.42",
+    "currency": "USD",
+    "date" : "2024-02-04T12:30:00Z",
+    "notes": "food shopping"
+}
