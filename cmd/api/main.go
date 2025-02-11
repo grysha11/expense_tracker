@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"net/http"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -11,6 +12,9 @@ import (
 func ExpenseRoutes() chi.Router {
 	r := chi.NewRouter()
 	expenseHandler := api.ExpenseHandler{}
+
+	r.Use(middleware.Logger)
+
 	r.Get("/", expenseHandler.ListExpenses)
 	r.Post("/", expenseHandler.CreateExpenses)
 	r.Get("/{id}", expenseHandler.GetExpenses)
@@ -22,6 +26,7 @@ func ExpenseRoutes() chi.Router {
 
 func main() {
 	r := chi.NewRouter()
+	addr := os.Getenv("ADDR")
 	r.Use(middleware.Logger)
 
 	fmt.Println("starting api")
@@ -30,7 +35,7 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 	r.Mount("/expenses", ExpenseRoutes())
-	err := http.ListenAndServe("localhost:8000", r)
+	err := http.ListenAndServe(addr, r)
 
 	if err != nil {
 		fmt.Println("Error: ", err)
