@@ -1,90 +1,93 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"github.com/go-chi/chi/v5"
 )
 
 type ExpenseHandler struct {
-
+	DB *sql.DB
 }
 
-func listExpenses() []*Expense {
-	return Expenses
-}
-
-func getExpense(id string) *Expense {
-	for _, expense := range Expenses {
-		if id == expense.ID {
-			return expense
-		}
+func (e ExpenseHandler) ListUsers(w http.ResponseWriter) {
+	rows, err := e.DB.Query("SELECT * FROM users")
+	if err != nil {
+		http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
+		return
 	}
-	return nil
-}
+	defer rows.Close()
 
-func addExpense(expense Expense) {
-	Expenses = append(Expenses, &expense)
-}
-
-func deleteExpense(id string) *Expense {
-	for i, expense := range Expenses {
-		if id == expense.ID {
-			Expenses = append(Expenses[:i], Expenses[i+1:]...)
-			return expense
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.Id, &user.Name, &user.Balance)
+		if err != nil {
+			panic(err.Error())
+			return
 		}
+		users = append(users, user)
 	}
-	return nil
-}
 
-func storeExpense(expense Expense) {
-	Expenses = append(Expenses, &expense)
-}
-
-func updateExpense(id string, change Expense) *Expense {
-	for i, expense := range Expenses {
-		if id == expense.ID {
-			Expenses[i] = &change
-			return expense
-		}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
 	}
-	return nil
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(users)
 }
 
 func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
-	err := json.NewEncoder(w).Encode(listExpenses())
+	id := chi.URLParam(r, "id")
+	query := "SELECT * FROM expensess WHERE user_id = ?"
+	rows, err := e.DB.Query(query, id)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		http.Error(w, "Failed to retrieve expenses", http.StatusInternalServerError)
 		return
 	}
-}
+	defer rows.Close()
 
-func (e ExpenseHandler) GetExpenses(w http.ResponseWriter, r *http.Request) {
-	expense := getExpense(chi.URLParam(r, "id"))
-	if expense == nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+	var expenses []Expense
+	for rows.Next() {
+		var expense Expense
+		err := rows.Scan(&expense.Id, &expense.UserId, &expense.Category, &expense.Amount, &expense.Date, &expense.Notes);
+		if err != nil {
+			http.Error(w, "Failed to scan expense", http.StatusInternalServerError)
+			return
+		}
+		expenses = append(expenses, expense)
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Failed to retrieve expenses", http.StatusInternalServerError)
 		return
 	}
-	err := json.NewEncoder(w).Encode(expense)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
+
+	w.Header().Set("Content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(expenses)
 }
 
 func (e ExpenseHandler) CreateExpenses(w http.ResponseWriter, r *http.Request) {
 	var expense Expense
-	err := json.NewDecoder(r.Body).Decode(expense)
+	err := json.NewDecoder(r.Body).Decode(&expense)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-	storeExpense(expense)
-	err = json.NewEncoder(w).Encode(expense)
+
+	query := "INSERT INTO expenses (user_id, category, amount, date, notes) VALUES (?, ?, ?, ?, ?)"
+	_, err = e.DB.Exec(query, expense.UserId, expense.Category, expense.Amount, expense.Date, expense.Notes)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(expense)
 }
 
 func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
@@ -92,25 +95,36 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	err := json.NewDecoder(r.Body).Decode(&expense)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-	updateExpense := updateExpense(id, expense)
-	if updateExpense == nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+
+	query := "UPDATE expenses SET user_id = ?, category = ?, amount = ?, date = ?, notes = ? WHERE id = ?"
+	_, err = e.DB.Exec(query, expense.UserId, expense.Category, expense.Amount, expense.Date, expense.Notes, id)
+	if err != nil {
+		http.Error(w, "Failed to update expense", http.StatusInternalServerError)
 		return
 	}
-	err = json.NewEncoder(w).Encode(updateExpense)
-	if err !=  nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
+
+	json.NewEncoder(w).Encode(expense)
 }
 
 func (e ExpenseHandler) DeleteExpenses(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	expense := deleteExpense(id)
-	if expense == nil {
+	query := "DELETE FROM expenses WHERE id = ?"
+	res, err := e.DB.Exec(query, id)
+	if err != nil {
+		http.Error(w, "Failed to delete expense", http.StatusInternalServerError)
+		return
+	}
+
+	checkDelete, err := res.RowsAffected()
+	if err != nil {
+		http.Error(w, "Failed to retrieve affected rows", http.StatusInternalServerError)
+		return
+	}
+
+	if checkDelete == 0 {
 		http.Error(w, "Expense not found", http.StatusNotFound)
 		return
 	}
