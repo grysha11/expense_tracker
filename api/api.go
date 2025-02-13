@@ -5,7 +5,7 @@ import "time"
 type User struct {
 	Id int `json:"id"`
 	Name string `json:"name"`
-	Balance float32 `json:"balance`
+	Balance float32 `json:"balance"`
 }
 
 type Expense struct {

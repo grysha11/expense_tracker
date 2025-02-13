@@ -11,7 +11,7 @@ type ExpenseHandler struct {
 	DB *sql.DB
 }
 
-func (e ExpenseHandler) ListUsers(w http.ResponseWriter) {
+func (e ExpenseHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := e.DB.Query("SELECT * FROM users")
 	if err != nil {
 		http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
@@ -24,7 +24,7 @@ func (e ExpenseHandler) ListUsers(w http.ResponseWriter) {
 		var user User
 		err := rows.Scan(&user.Id, &user.Name, &user.Balance)
 		if err != nil {
-			panic(err.Error())
+			http.Error(w, "Failed to scan users", http.StatusInternalServerError)
 			return
 		}
 		users = append(users, user)
@@ -42,7 +42,7 @@ func (e ExpenseHandler) ListUsers(w http.ResponseWriter) {
 
 func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	query := "SELECT * FROM expensess WHERE user_id = ?"
+	query := "SELECT * FROM expenses WHERE user_id = ?"
 	rows, err := e.DB.Query(query, id)
 	if err != nil {
 		http.Error(w, "Failed to retrieve expenses", http.StatusInternalServerError)

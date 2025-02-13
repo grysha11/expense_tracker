@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"database/sql"
 	"net/http"
 	"github.com/go-chi/chi/v5"
@@ -22,7 +21,7 @@ func ExpenseRoutes(db *sql.DB) chi.Router {
 
 	r.Get("/", expenseHandler.ListUsers)
 	r.Post("/", expenseHandler.CreateExpenses)
-	r.Get("/{id}", expenseHandler.GetExpenses)
+	r.Get("/{id}", expenseHandler.ListExpenses)
 	r.Put("/{id}", expenseHandler.UpdateExpense)
 	r.Delete("/{id}", expenseHandler.DeleteExpenses)
 
@@ -30,7 +29,7 @@ func ExpenseRoutes(db *sql.DB) chi.Router {
 }
 
 func main() {
-	database, err := sql.Open("mysql", GetDSN())
+	database, err := sql.Open("mysql", db.GetDSN())
 	if err != nil {
 		fmt.Println("error initializing db")
 		panic(err.Error())
@@ -51,7 +50,7 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
-	r.Mount("/user", ExpenseRoutes())
+	r.Mount("/user", ExpenseRoutes(database))
 	err = http.ListenAndServe(SERVER_PORT, r)
 
 	if err != nil {
