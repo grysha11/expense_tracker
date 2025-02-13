@@ -22,7 +22,7 @@ func (e ExpenseHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.Id, &user.Name, &user.Balance)
+		err := rows.Scan(&user.UserId, &user.Name, &user.Balance)
 		if err != nil {
 			http.Error(w, "Failed to scan users", http.StatusInternalServerError)
 			return
@@ -41,9 +41,9 @@ func (e ExpenseHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	userId := chi.URLParam(r, "user_id")
 	query := "SELECT * FROM expenses WHERE user_id = ?"
-	rows, err := e.DB.Query(query, id)
+	rows, err := e.DB.Query(query, userId)
 	if err != nil {
 		http.Error(w, "Failed to retrieve expenses", http.StatusInternalServerError)
 		return
@@ -71,8 +71,28 @@ func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(expenses)
 }
 
-func (e ExpenseHandler) CreateExpenses(w http.ResponseWriter, r *http.Request) {
+func (e ExpenseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var user User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	query := "INSERT INTO users (user_id, name, balance) VALUES (?, ?, ?, ?, ?)"
+	_, err = e.DB.Exec(query, user.UserId, user.Name, user.Balance)
+	if err != nil {
+		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(user)
+}
+
+func (e ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	var expense Expense
+	userId := chi.URLParam(r, "user_id")
 	err := json.NewDecoder(r.Body).Decode(&expense)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
@@ -80,12 +100,13 @@ func (e ExpenseHandler) CreateExpenses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := "INSERT INTO expenses (user_id, category, amount, date, notes) VALUES (?, ?, ?, ?, ?)"
-	_, err = e.DB.Exec(query, expense.UserId, expense.Category, expense.Amount, expense.Date, expense.Notes)
+	_, err = e.DB.Exec(query, userId, expense.Category, expense.Amount, expense.Date, expense.Notes)
 	if err != nil {
 		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
 		return
 	}
 
+	expense.UserId = userId
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(expense)
 }
@@ -106,10 +127,11 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(expense)
 }
 
-func (e ExpenseHandler) DeleteExpenses(w http.ResponseWriter, r *http.Request) {
+func (e ExpenseHandler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	query := "DELETE FROM expenses WHERE id = ?"
 	res, err := e.DB.Exec(query, id)

@@ -3,7 +3,7 @@ package api
 import "time"
 
 type User struct {
-	Id int `json:"id"`
+	UserId int `json:"user_id"`
 	Name string `json:"name"`
 	Balance float32 `json:"balance"`
 }

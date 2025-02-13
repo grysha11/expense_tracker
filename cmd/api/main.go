@@ -20,10 +20,11 @@ func ExpenseRoutes(db *sql.DB) chi.Router {
 	r.Use(middleware.Logger)
 
 	r.Get("/", expenseHandler.ListUsers)
-	r.Post("/", expenseHandler.CreateExpenses)
-	r.Get("/{id}", expenseHandler.ListExpenses)
-	r.Put("/{id}", expenseHandler.UpdateExpense)
-	r.Delete("/{id}", expenseHandler.DeleteExpenses)
+	r.Post("/", expenseHandler.CreateUser)
+	r.Post("/{user_id}/expenses", expenseHandler.CreateExpense)
+	r.Get("/{user_id}/expenses", expenseHandler.ListExpenses)
+	r.Put("/{user_id}/expenses/{id}", expenseHandler.UpdateExpense)
+	r.Delete("/{user_id}/expenses/{id}", expenseHandler.DeleteExpense)
 
 	return r
 }
@@ -44,13 +45,14 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(api.ErrorHandler)
 
 	fmt.Println("starting api and listening on port" + SERVER_PORT + "...")
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
-	r.Mount("/user", ExpenseRoutes(database))
+	r.Mount("/users", ExpenseRoutes(database))
 	err = http.ListenAndServe(SERVER_PORT, r)
 
 	if err != nil {
