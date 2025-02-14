@@ -1,10 +1,12 @@
 package api
 
 import (
+	"strconv"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"github.com/go-chi/chi/v5"
+	"time"
 )
 
 type ExpenseHandler struct {
@@ -41,7 +43,12 @@ func (e ExpenseHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
-	userId := chi.URLParam(r, "user_id")
+	strUserId := chi.URLParam(r, "user_id")
+	userId, err := strconv.Atoi(strUserId)
+	if err != nil {
+		http.Error(w, "Failed to convert user_id", http.StatusInternalServerError)
+		return
+	}
 	query := "SELECT * FROM expenses WHERE user_id = ?"
 	rows, err := e.DB.Query(query, userId)
 	if err != nil {
@@ -55,7 +62,7 @@ func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 		var expense Expense
 		err := rows.Scan(&expense.Id, &expense.UserId, &expense.Category, &expense.Amount, &expense.Date, &expense.Notes);
 		if err != nil {
-			http.Error(w, "Failed to scan expense", http.StatusInternalServerError)
+			http.Error(w, "Failed to scan expense: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		expenses = append(expenses, expense)
@@ -79,10 +86,10 @@ func (e ExpenseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "INSERT INTO users (user_id, name, balance) VALUES (?, ?, ?, ?, ?)"
-	_, err = e.DB.Exec(query, user.UserId, user.Name, user.Balance)
+	query := "INSERT INTO users (name, balance) VALUES (?, ?)"
+	_, err = e.DB.Exec(query, user.Name, user.Balance)
 	if err != nil {
-		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
 
@@ -92,15 +99,20 @@ func (e ExpenseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (e ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	var expense Expense
-	userId := chi.URLParam(r, "user_id")
-	err := json.NewDecoder(r.Body).Decode(&expense)
+	strUserId := chi.URLParam(r, "user_id")
+	userId, err := strconv.Atoi(strUserId)
+	if err != nil {
+		http.Error(w, "Failed to convert user_id", http.StatusInternalServerError)
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&expense)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	query := "INSERT INTO expenses (user_id, category, amount, date, notes) VALUES (?, ?, ?, ?, ?)"
-	_, err = e.DB.Exec(query, userId, expense.Category, expense.Amount, expense.Date, expense.Notes)
+	query := "INSERT INTO expenses (user_id, category, amount, notes) VALUES (?, ?, ?, ?)"
+	_, err = e.DB.Exec(query, userId, expense.Category, expense.Amount, expense.Notes)
 	if err != nil {
 		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
 		return
@@ -120,10 +132,15 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	expense.Date, err = time.Parse("2005-06-02 12:00:00", expense.Date)
+	if err != nil {
+		http.Error(w, "Failed to convert time: "+err.Error(), http.StatusInternalServerError)
+	}
+
 	query := "UPDATE expenses SET user_id = ?, category = ?, amount = ?, date = ?, notes = ? WHERE id = ?"
 	_, err = e.DB.Exec(query, expense.UserId, expense.Category, expense.Amount, expense.Date, expense.Notes, id)
 	if err != nil {
-		http.Error(w, "Failed to update expense", http.StatusInternalServerError)
+		http.Error(w, "Failed to update expense: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

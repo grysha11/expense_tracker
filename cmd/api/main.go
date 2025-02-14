@@ -11,7 +11,7 @@ import (
 	"github.com/grysha11/expense_tracker/db"
 )
 
-const SERVER_PORT string = ":3306"
+const SERVER_PORT string = ":8080"
 
 func ExpenseRoutes(db *sql.DB) chi.Router {
 	expenseHandler := api.ExpenseHandler{DB: db}

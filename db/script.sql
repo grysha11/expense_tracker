@@ -5,7 +5,7 @@ USE `users_db`;
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    balance FLOAT DEFAULT 0.0,
+    balance FLOAT DEFAULT 0.0
 );
 
 CREATE TABLE expenses (
