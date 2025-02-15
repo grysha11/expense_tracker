@@ -60,10 +60,15 @@ func (e ExpenseHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 	var expenses []Expense
 	for rows.Next() {
 		var expense Expense
-		err := rows.Scan(&expense.Id, &expense.UserId, &expense.Category, &expense.Amount, &expense.Date, &expense.Notes);
+		var dateStr string
+		err := rows.Scan(&expense.Id, &expense.UserId, &expense.Category, &expense.Amount, &dateStr, &expense.Notes);
 		if err != nil {
 			http.Error(w, "Failed to scan expense: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+		expense.Date, err = time.Parse("2006-01-02 15:04:05", dateStr)
+		if err != nil {
+			http.Error(w, "Failed to convert date: "+err.Error(), http.StatusInternalServerError)
 		}
 		expenses = append(expenses, expense)
 	}
@@ -103,6 +108,7 @@ func (e ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	userId, err := strconv.Atoi(strUserId)
 	if err != nil {
 		http.Error(w, "Failed to convert user_id", http.StatusInternalServerError)
+		return
 	}
 
 	err = json.NewDecoder(r.Body).Decode(&expense)
@@ -132,7 +138,8 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expense.Date, err = time.Parse("2005-06-02 12:00:00", expense.Date)
+	dateStr := expense.Date.Format("2006-01-02 15:04:05")
+	expense.Date, err = time.Parse("2006-01-02 15:04:05", dateStr)
 	if err != nil {
 		http.Error(w, "Failed to convert time: "+err.Error(), http.StatusInternalServerError)
 	}

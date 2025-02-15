@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 type User struct {
 	UserId int `json:"user_id"`
 	Name string `json:"name"`
@@ -11,6 +13,6 @@ type Expense struct {
 	UserId int `json:"user_id"`
 	Category string `json:"category"`
 	Amount float32 `json:"amount"`
-	Date string `json:"date"`
+	Date time.Time `json:"date"`
 	Notes string `json:"notes"`
 }
