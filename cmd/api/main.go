@@ -21,6 +21,7 @@ func ExpenseRoutes(db *sql.DB) chi.Router {
 
 	r.Get("/", expenseHandler.ListUsers)
 	r.Post("/", expenseHandler.CreateUser)
+	r.Put("/{user_id}", expenseHandler.UpdateUser)
 	r.Post("/{user_id}/expenses", expenseHandler.CreateExpense)
 	r.Get("/{user_id}/expenses", expenseHandler.ListExpenses)
 	r.Put("/{user_id}/expenses/{id}", expenseHandler.UpdateExpense)

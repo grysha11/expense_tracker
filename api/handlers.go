@@ -13,6 +13,21 @@ type ExpenseHandler struct {
 	DB *sql.DB
 }
 
+func checkExpense(expense Expense, userId int) bool {
+	if expense.Id <= 0 || userId <= 0 || expense.Category == "" ||
+		expense.Amount <= 0 || expense.Notes == "" {
+			return false
+		}
+		return true
+}
+
+func checkUser(user User) bool {
+	if user.UserId <= 0 || user.Name == "" || user.Balance <= 0 {
+			return false
+		}
+		return true
+}
+
 func (e ExpenseHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	rows, err := e.DB.Query("SELECT * FROM users")
 	if err != nil {
@@ -91,6 +106,11 @@ func (e ExpenseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkUser(user) {
+		http.Error(w, "Invalid user values", http.StatusBadRequest)
+		return
+	}
+
 	query := "INSERT INTO users (name, balance) VALUES (?, ?)"
 	_, err = e.DB.Exec(query, user.Name, user.Balance)
 	if err != nil {
@@ -108,6 +128,11 @@ func (e ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	userId, err := strconv.Atoi(strUserId)
 	if err != nil {
 		http.Error(w, "Failed to convert user_id", http.StatusInternalServerError)
+		return
+	}
+
+	if !checkExpense(expense, userId) {
+		http.Error(w, "Invalid expense values", http.StatusBadRequest)
 		return
 	}
 
@@ -142,6 +167,12 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	expense.Date, err = time.Parse("2006-01-02 15:04:05", dateStr)
 	if err != nil {
 		http.Error(w, "Failed to convert time: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if checkExpense(expense, expense.UserId) {
+		http.Error(w, "Invalid expense values", http.StatusBadRequest)
+		return
 	}
 
 	query := "UPDATE expenses SET user_id = ?, category = ?, amount = ?, date = ?, notes = ? WHERE id = ?"
@@ -153,6 +184,31 @@ func (e ExpenseHandler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(expense)
+}
+
+func (e ExpenseHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	var user User
+	user_id := chi.URLParam(r, "user_id")
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	if checkUser(user) {
+		http.Error(w, "Invalid user values", http.StatusBadRequest)
+		return
+	}
+
+	query := "UPDATE users SET user_id = ?, name = ?, balance = ? WHERE user_id = ?"
+	_, err = e.DB.Exec(query, user.UserId, user.Name, user.Balance, user_id)
+	if err != nil {
+		http.Error(w, "Failed to update user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
 }
 
 func (e ExpenseHandler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
